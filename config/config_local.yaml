@@ -1,0 +1,12 @@
+env: "local"
+postgres:
+  host: "0.0.0.0"
+  port: 5555
+  user: "authservice"
+  password: "1234"
+  dbname: "authservice"
+  sslmode: "disable"
+migrations_path: "migrations"
+grpc:
+  port: 44044
+  timeout: 10h
