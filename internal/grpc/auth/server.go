@@ -25,7 +25,7 @@ type Auth interface { // интерфейс логики регистрации/
 		ctx context.Context,
 		email string,
 		password string,
-	) (userID int64, err error)
+	) (userIds int64, err error)
 }
 
 func Register(gRPCServer *grpc.Server, auth Auth) {

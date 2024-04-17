@@ -2,7 +2,7 @@ package main
 
 import (
 	"auth_service/internal/config"
-	"auth_service/internal/logger"
+	"auth_service/internal/lib/logger"
 )
 
 func main() {

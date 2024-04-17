@@ -8,9 +8,9 @@ import (
 )
 
 type Config struct {
-	Env           string     `yaml:"env" env-default:"local"`
-	GRPC          GRPCConfig `yaml:"grpc"`
-	MigrationPath string
+	Env           string           `yaml:"env" env-default:"local"`
+	GRPC          GRPCConfig       `yaml:"grpc"`
+	MigrationPath string           `yaml:"migrations_path"`
 	TokenTTL      time.Duration    `yaml:"token_ttl" env-default:"1h"`
 	Postgres      PostgreSQLConfig `yaml:"postgres" env-required:"true"`
 }
