@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"auth_service/internal/services/auth"
+	"auth_service/internal/storage"
 	"context"
 	"errors"
 	ssov1 "github.com/KanatTem/sso_proto/gen/go/sso"

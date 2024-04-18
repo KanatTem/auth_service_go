@@ -1,8 +1,12 @@
 package main
 
 import (
+	"auth_service/internal/app"
 	"auth_service/internal/config"
 	"auth_service/internal/lib/logger"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
@@ -13,9 +17,18 @@ func main() {
 	if log == nil {
 	}
 
-	// TODO: инициализировать логгер
+	application := app.New(log, cfg.GRPC.Port, cfg.TokenTTL)
 
-	// TODO: инициализировать приложение (app)
+	go application.GRPCServer.MustRun()
 
-	// TODO: запустить gRPC-сервер приложения
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+
+	<-stop
+
+	// initiate  shutdown
+	application.GRPCServer.Stop()
+	application.Storage.Stop()
+	log.Info("Gracefully stopped")
+
 }

@@ -4,12 +4,17 @@ import (
 	"auth_service/internal/domain/models"
 	"auth_service/internal/lib/jwt"
 	"auth_service/internal/lib/logger"
+	"auth_service/internal/storage"
 	"errors"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/net/context"
 	"log/slog"
 	"time"
+)
+
+var (
+	ErrInvalidCredentials = errors.New("invalid credentials")
 )
 
 type UserStore interface {
@@ -71,7 +76,7 @@ func (a *Auth) RegisterNewUser(ctx context.Context, email string, pass string) (
 	return userID, nil
 }
 
-func (a *Auth) LoginLogin(
+func (a *Auth) Login(
 	ctx context.Context,
 	email string,
 	password string,
@@ -108,7 +113,7 @@ func (a *Auth) LoginLogin(
 	}
 	log.Info("Successfully logged in")
 
-	token, err := jwt.NewToken(user, app, a.tokenTTL)
+	token, err = jwt.NewToken(user, app, a.tokenTTL)
 
 	if err != nil {
 		a.log.Error("Failed to create token", logger.Err(err))
