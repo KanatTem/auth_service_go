@@ -81,7 +81,7 @@ func (a *Auth) Login(
 	email string,
 	password string,
 	appID int,
-) (token string, err error) {
+) (string, error) {
 	const op = "Auth.Login"
 
 	log := a.log.With(
@@ -113,7 +113,7 @@ func (a *Auth) Login(
 	}
 	log.Info("Successfully logged in")
 
-	token, err = jwt.NewToken(user, app, a.tokenTTL)
+	token, err := jwt.NewToken(user, app, a.tokenTTL)
 
 	if err != nil {
 		a.log.Error("Failed to create token", logger.Err(err))
