@@ -28,11 +28,24 @@ type GRPCConfig struct {
 	Timeout time.Duration `yaml:"timeout" env-default:"1h"`
 }
 
+func MustLoadFromPath(configPath string) *Config {
+
+	return ReadConfig(configPath)
+
+}
+
 func MustLoad() *Config {
-	configPath := fetchConfigPath()
+
+	configPath := os.Getenv("CONFIG_PATH")
+
+	return ReadConfig(configPath)
+
+}
+
+func ReadConfig(configPath string) *Config {
 
 	if configPath == "" {
-		panic("config path empty")
+		panic("config path is empty")
 	}
 
 	_, err := os.Stat(configPath)
@@ -50,12 +63,4 @@ func MustLoad() *Config {
 	}
 
 	return &cfg
-}
-
-func fetchConfigPath() string {
-	var configPath string
-
-	configPath = os.Getenv("CONFIG_PATH")
-
-	return configPath
 }

@@ -10,20 +10,26 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
+// go run ./cmd/migrator  --migrations-table=migrations --config-path=config/config_local.yaml --migrations-path=migrations
+// go run ./cmd/migrator  --migrations-table=migrations_test --config-path=config/config_local.yaml --migrations-path=tests/migrations
 func main() {
-	var cfgPath, migrationsTable string
-
-	flag.StringVar(&cfgPath, "config", "config_local.yaml", "path to YAML config")
+	var configPath, migrationsTable, migrationsPath string
 
 	flag.StringVar(&migrationsTable, "migrations-table", "migrations", "path to migrations table")
 
+	flag.StringVar(&configPath, "config-path", "config", "path to config")
+
+	flag.StringVar(&migrationsPath, "migrations-path", "migrations", "path to migrations")
+
 	flag.Parse()
 
-	cfg := config.MustLoad()
+	cfg := config.MustLoadFromPath(configPath)
 
-	migrationsPath := cfg.MigrationPath
 	if migrationsPath == "" {
-		panic("migrations path is empty in config")
+		migrationsPath = cfg.MigrationPath
+		if migrationsPath == "" {
+			panic("migrations path is empty in config")
+		}
 	}
 
 	connStr := fmt.Sprintf(

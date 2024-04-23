@@ -37,11 +37,12 @@ func (s *Storage) Stop() {
 
 }
 
+/*
 func (s *Storage) SaveUser(ctx context.Context, email string, passHash []byte) (int64, error) {
 
 	const op = "storage.postgres.SaveUser"
 
-	stmt, err := s.db.Prepare("INSERT into users(email, password_hash) VALUES ($1, $2)")
+	stmt, err := s.db.Prepare("INSERT into users(email, pass_hash) VALUES ($1, $2)")
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
@@ -62,6 +63,34 @@ func (s *Storage) SaveUser(ctx context.Context, email string, passHash []byte) (
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
+	return id, nil
+}
+/*
+*/
+
+func (s *Storage) SaveUser(ctx context.Context, email string, passHash []byte) (int64, error) {
+	const op = "storage.postgres.SaveUser"
+
+	// 1) Prepare the INSERT with RETURNING id
+	query := `
+        INSERT INTO users (email, pass_hash)
+        VALUES ($1, $2)
+        RETURNING id
+    `
+
+	// 2) Use QueryRowContext to execute and scan the new id
+	var id int64
+	err := s.db.QueryRowContext(ctx, query, email, passHash).Scan(&id)
+	if err != nil {
+		// handle unique‐constraint violation, etc.
+		if pgErr, ok := err.(*pq.Error); ok {
+			if pgErr.Code == "23505" { // unique_violation
+				return 0, storage.ErrUserExists
+			}
+		}
+		return 0, fmt.Errorf("%s: %w", op, err)
+	}
+
 	return id, nil
 }
 
