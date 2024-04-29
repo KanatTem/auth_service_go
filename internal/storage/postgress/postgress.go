@@ -37,37 +37,6 @@ func (s *Storage) Stop() {
 
 }
 
-/*
-func (s *Storage) SaveUser(ctx context.Context, email string, passHash []byte) (int64, error) {
-
-	const op = "storage.postgres.SaveUser"
-
-	stmt, err := s.db.Prepare("INSERT into users(email, pass_hash) VALUES ($1, $2)")
-	if err != nil {
-		return 0, fmt.Errorf("%s: %w", op, err)
-	}
-
-	res, err := stmt.ExecContext(ctx, email, passHash)
-
-	if err != nil {
-		var pqErr *pq.Error
-		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
-			// 23505 = unique_violation
-			return 0, fmt.Errorf("%s: %w", op, storage.ErrUserExists)
-		}
-
-		return 0, fmt.Errorf("%s: %w", op, err)
-	}
-
-	id, err := res.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("%s: %w", op, err)
-	}
-	return id, nil
-}
-/*
-*/
-
 func (s *Storage) SaveUser(ctx context.Context, email string, passHash []byte) (int64, error) {
 	const op = "storage.postgres.SaveUser"
 
@@ -140,4 +109,56 @@ func (s *Storage) GetApp(ctx context.Context, id int) (models.App, error) {
 
 	return app, nil
 
+}
+
+func (s *Storage) GetRoles(ctx context.Context, userId int64) (models.UserRoles, error) {
+
+	const op = "storage.postgres.GetRoles"
+
+	q := "SELECT user_id,role_id,roles.name FROM user_roles JOIN roles ON user_roles.role_id = roles.id WHERE user_roles.user_id = $1"
+
+	rows, err := s.db.QueryContext(ctx, q, userId)
+
+	if err != nil {
+		return models.UserRoles{}, fmt.Errorf("%s: %w", op, err)
+	}
+
+	var userRoles models.UserRoles
+
+	userRoles.UserId = userId
+
+	for rows.Next() {
+		var uid, rid int64
+		var roleName string
+		if err := rows.Scan(&uid, &rid, &roleName); err != nil {
+			return models.UserRoles{}, fmt.Errorf("%s: scan error: %w", op, err)
+		}
+		userRoles.Roles = append(userRoles.Roles, models.Role{
+			ID:   int(rid),
+			Name: roleName,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return models.UserRoles{}, fmt.Errorf("%s: %w", op, err)
+	}
+	return userRoles, nil
+}
+
+func (s *Storage) IsAdmin(ctx context.Context, userId int64) (bool, error) {
+
+	const op = "storage.postgres.isAdmin"
+
+	UserRoles, err := s.GetRoles(ctx, userId)
+
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	for _, r := range UserRoles.Roles {
+		if r.ID == models.AdminRoleId {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
