@@ -4,6 +4,7 @@ import (
 	"auth_service/internal/domain/models"
 	"auth_service/internal/lib/jwt"
 	"auth_service/internal/lib/logger"
+	"auth_service/internal/lib/parser"
 	"auth_service/internal/storage"
 	"errors"
 	"fmt"
@@ -22,28 +23,36 @@ type UserStore interface {
 	GetUser(ctx context.Context, email string) (user models.User, err error)
 }
 
+type RolesProvider interface {
+	GetRolesByApp(ctx context.Context, userId int64, appId int64) (models.UserRoles, error)
+	GetRoles(ctx context.Context, userId int64) (models.UserRoles, error)
+}
+
 type AppProvider interface {
 	GetApp(ctx context.Context, appId int) (app models.App, err error)
 }
 
 type Auth struct {
-	log         *slog.Logger
-	userStore   UserStore
-	appProvider AppProvider
-	tokenTTL    time.Duration
+	log          *slog.Logger
+	userStore    UserStore
+	appProvider  AppProvider
+	roleProvider RolesProvider
+	tokenTTL     time.Duration
 }
 
 func New(
 	log *slog.Logger,
 	userStore UserStore,
 	appProvider AppProvider,
+	roleProvider RolesProvider,
 	tokenTTL time.Duration,
 ) *Auth {
 	return &Auth{
-		userStore:   userStore,
-		log:         log,
-		appProvider: appProvider,
-		tokenTTL:    tokenTTL, // Время жизни возвращаемых токенов
+		userStore:    userStore,
+		log:          log,
+		appProvider:  appProvider,
+		roleProvider: roleProvider,
+		tokenTTL:     tokenTTL, // Время жизни возвращаемых токенов
 	}
 }
 
@@ -113,7 +122,15 @@ func (a *Auth) Login(
 	}
 	log.Info("Successfully logged in")
 
-	token, err := jwt.NewToken(user, app, a.tokenTTL)
+	userRoles, err := a.roleProvider.GetRolesByApp(ctx, user.ID, int64(appID))
+
+	if err != nil {
+		a.log.Error("Failed to get roles for user", logger.Err(err))
+	}
+
+	roles := parser.ParseUserRoles(userRoles)
+
+	token, err := jwt.NewToken(user, app, roles, a.tokenTTL)
 
 	if err != nil {
 		a.log.Error("Failed to create token", logger.Err(err))

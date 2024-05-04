@@ -115,7 +115,7 @@ func (s *Storage) GetRoles(ctx context.Context, userId int64) (models.UserRoles,
 
 	const op = "storage.postgres.GetRoles"
 
-	q := "SELECT user_id,role_id,roles.name FROM user_roles JOIN roles ON user_roles.role_id = roles.id WHERE user_roles.user_id = $1"
+	q := "SELECT user_id,role_id,roles.name,roles.app_id FROM user_roles JOIN roles ON user_roles.role_id = roles.id WHERE user_roles.user_id = $1"
 
 	rows, err := s.db.QueryContext(ctx, q, userId)
 
@@ -128,14 +128,15 @@ func (s *Storage) GetRoles(ctx context.Context, userId int64) (models.UserRoles,
 	userRoles.UserId = userId
 
 	for rows.Next() {
-		var uid, rid int64
+		var uid, rid, aid int64
 		var roleName string
-		if err := rows.Scan(&uid, &rid, &roleName); err != nil {
+		if err := rows.Scan(&uid, &rid, &roleName, &aid); err != nil {
 			return models.UserRoles{}, fmt.Errorf("%s: scan error: %w", op, err)
 		}
 		userRoles.Roles = append(userRoles.Roles, models.Role{
-			ID:   int(rid),
-			Name: roleName,
+			ID:    int(rid),
+			Name:  roleName,
+			AppId: int(aid),
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -144,21 +145,58 @@ func (s *Storage) GetRoles(ctx context.Context, userId int64) (models.UserRoles,
 	return userRoles, nil
 }
 
-func (s *Storage) IsAdmin(ctx context.Context, userId int64) (bool, error) {
+func (s *Storage) GetRolesByApp(ctx context.Context, userId int64, appId int64) (models.UserRoles, error) {
+
+	const op = "storage.postgres.GetRolesByApp"
+
+	q := "SELECT user_id,role_id,roles.name,roles.app_id FROM user_roles JOIN roles ON user_roles.role_id = roles.id WHERE user_roles.user_id = $1 AND roles.app_id = $2"
+
+	rows, err := s.db.QueryContext(ctx, q, userId, appId)
+
+	if err != nil {
+		return models.UserRoles{}, fmt.Errorf("%s: %w", op, err)
+	}
+
+	var userRoles models.UserRoles
+
+	userRoles.UserId = userId
+
+	for rows.Next() {
+		var uid, rid, aid int64
+		var roleName string
+		if err := rows.Scan(&uid, &rid, &roleName, &aid); err != nil {
+			return models.UserRoles{}, fmt.Errorf("%s: scan error: %w", op, err)
+		}
+		userRoles.Roles = append(userRoles.Roles, models.Role{
+			ID:    int(rid),
+			Name:  roleName,
+			AppId: int(aid),
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return models.UserRoles{}, fmt.Errorf("%s: %w", op, err)
+	}
+	return userRoles, nil
+}
+
+func (s *Storage) IsAdmin(ctx context.Context, userId int64, appId int64) (bool, error) {
 
 	const op = "storage.postgres.isAdmin"
 
-	UserRoles, err := s.GetRoles(ctx, userId)
-
+	stmt, err := s.db.Prepare("SELECT user_id,role_id,roles.name,roles.app_id FROM user_roles JOIN roles ON user_roles.role_id = roles.id WHERE user_roles.user_id = $1 AND roles.app_id = $2 AND roles.name = $3")
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", op, err)
 	}
 
-	for _, r := range UserRoles.Roles {
-		if r.ID == models.AdminRoleId {
-			return true, nil
+	err = stmt.QueryRowContext(ctx, userId, appId, "admin").Scan()
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, fmt.Errorf("%s: %w", op, storage.ErrUserNotAdmin)
 		}
+		return false, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return false, nil
+	return true, nil
+
 }

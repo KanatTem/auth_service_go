@@ -3,7 +3,7 @@ module auth_service
 go 1.24
 
 require (
-	github.com/KanatTem/sso_proto v0.0.0-20250421135011-9a99994426cb
+	github.com/KanatTem/sso_proto v0.0.0-20250504084318-a3613a55d434
 	github.com/brianvoe/gofakeit/v6 v6.23.2
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.18.2
