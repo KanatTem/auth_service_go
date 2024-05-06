@@ -199,3 +199,49 @@ func TestLogin_FailCases(t *testing.T) {
 		})
 	}
 }
+
+func TestRegister_AssignDefaultRole_CheckRole_HappyPath(t *testing.T) {
+	ctx, st := suite.New(t) // Создаём Suite
+
+	email := gofakeit.Email()
+	pass := gofakeit.Password(true, true, true, true, false, passLen)
+
+	//register
+	respReg, err := st.AuthClient.Register(ctx, &ssov1.RegisterRequest{
+		Email:    email,
+		Password: pass,
+	})
+	//register check
+	require.NoError(t, err)
+	assert.NotEmpty(t, respReg.GetUserId())
+
+	//login
+	respLogin, err := st.AuthClient.Login(ctx, &ssov1.LoginRequest{
+		Email:    email,
+		Password: pass,
+		AppId:    appID,
+	})
+
+	//logic check
+	require.NoError(t, err)
+	token := respLogin.GetToken()
+	require.NotEmpty(t, token)
+
+	tokenParsed, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		return []byte(appSecret), nil
+	})
+	require.NoError(t, err)
+
+	claims, ok := tokenParsed.Claims.(jwt.MapClaims)
+	require.True(t, ok)
+
+	assert.Equal(t, respReg.GetUserId(), int64(claims["userId"].(float64)))
+	assert.Equal(t, email, claims["email"].(string))
+	assert.Equal(t, appID, int(claims["app_id"].(float64)))
+	rolesSlice, ok := claims["roles"].([]interface{})
+
+	require.True(t, ok, "roles claim is not a slice")
+
+	assert.Contains(t, rolesSlice, "user", "user role not found in JWT claims")
+
+}

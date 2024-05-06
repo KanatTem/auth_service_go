@@ -5,6 +5,7 @@ import (
 	"auth_service/internal/lib/jwt"
 	"auth_service/internal/lib/logger"
 	"auth_service/internal/lib/parser"
+	"auth_service/internal/services/roles"
 	"auth_service/internal/storage"
 	"errors"
 	"fmt"
@@ -24,7 +25,7 @@ type UserStore interface {
 }
 
 type RolesProvider interface {
-	GetRolesByApp(ctx context.Context, userId int64, appId int64) (models.UserRoles, error)
+	GetUserRolesByApp(ctx context.Context, userId int64, appId int64) (models.UserRoles, error)
 	GetRoles(ctx context.Context, userId int64) (models.UserRoles, error)
 }
 
@@ -37,6 +38,7 @@ type Auth struct {
 	userStore    UserStore
 	appProvider  AppProvider
 	roleProvider RolesProvider
+	roleManager  *roles.RoleManager
 	tokenTTL     time.Duration
 }
 
@@ -45,6 +47,7 @@ func New(
 	userStore UserStore,
 	appProvider AppProvider,
 	roleProvider RolesProvider,
+	roleManager *roles.RoleManager,
 	tokenTTL time.Duration,
 ) *Auth {
 	return &Auth{
@@ -52,6 +55,7 @@ func New(
 		log:          log,
 		appProvider:  appProvider,
 		roleProvider: roleProvider,
+		roleManager:  roleManager,
 		tokenTTL:     tokenTTL, // Время жизни возвращаемых токенов
 	}
 }
@@ -122,15 +126,30 @@ func (a *Auth) Login(
 	}
 	log.Info("Successfully logged in")
 
-	userRoles, err := a.roleProvider.GetRolesByApp(ctx, user.ID, int64(appID))
+	userRoles, err := a.roleProvider.GetUserRolesByApp(ctx, user.ID, int64(appID))
 
 	if err != nil {
 		a.log.Error("Failed to get roles for user", logger.Err(err))
 	}
 
-	roles := parser.ParseUserRoles(userRoles)
+	if len(userRoles.Roles) == 0 {
+		_, err := a.roleManager.AssignDefaultRole(ctx, user.ID, appID)
 
-	token, err := jwt.NewToken(user, app, roles, a.tokenTTL)
+		if err != nil {
+			a.log.Error("Failed to assign default role", logger.Err(err))
+		}
+
+		userRoles, err = a.roleProvider.GetUserRolesByApp(ctx, user.ID, int64(appID))
+
+		if err != nil {
+			a.log.Error("Failed to get roles for user", logger.Err(err))
+		}
+
+	}
+
+	jwtRoles := parser.ParseUserRoles(userRoles)
+
+	token, err := jwt.NewToken(user, app, jwtRoles, a.tokenTTL)
 
 	if err != nil {
 		a.log.Error("Failed to create token", logger.Err(err))

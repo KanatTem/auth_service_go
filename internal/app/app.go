@@ -4,6 +4,7 @@ import (
 	"auth_service/internal/app/grpc"
 	"auth_service/internal/config"
 	"auth_service/internal/services/auth"
+	"auth_service/internal/services/roles"
 	"auth_service/internal/storage/postgress"
 	"fmt"
 	"log/slog"
@@ -37,7 +38,9 @@ func New(
 		panic(err)
 	}
 
-	authService := auth.New(log, storage, storage, storage, tokenTTL)
+	rolesManager := roles.New(log, storage)
+
+	authService := auth.New(log, storage, storage, storage, rolesManager, tokenTTL)
 
 	grpcApp := grpc.New(log, authService, grpcPort)
 

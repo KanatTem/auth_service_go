@@ -145,7 +145,7 @@ func (s *Storage) GetRoles(ctx context.Context, userId int64) (models.UserRoles,
 	return userRoles, nil
 }
 
-func (s *Storage) GetRolesByApp(ctx context.Context, userId int64, appId int64) (models.UserRoles, error) {
+func (s *Storage) GetUserRolesByApp(ctx context.Context, userId int64, appId int64) (models.UserRoles, error) {
 
 	const op = "storage.postgres.GetRolesByApp"
 
@@ -199,4 +199,52 @@ func (s *Storage) IsAdmin(ctx context.Context, userId int64, appId int64) (bool,
 
 	return true, nil
 
+}
+
+func (s *Storage) GetRoleByApp(ctx context.Context, appId int64, name string) (models.Role, error) {
+
+	const op = "storage.postgres.GetRoleByApp"
+
+	stmt, err := s.db.Prepare("SELECT * FROM roles WHERE app_id = $1 AND name = $2")
+	if err != nil {
+		return models.Role{}, fmt.Errorf("%s: %w", op, err)
+	}
+
+	var role models.Role
+
+	err = stmt.QueryRowContext(ctx, appId, name).Scan(&role.ID, &role.AppId, &role.Name)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.Role{}, fmt.Errorf("%s: %w", op, storage.ErrRoleNotFound)
+		}
+		return models.Role{}, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return role, nil
+
+}
+
+func (s *Storage) SaveRole(
+	ctx context.Context,
+	userID int64,
+	roleID int,
+) error {
+	const op = "storage.postgres.SaveRole"
+
+	query := `
+        INSERT INTO user_roles (user_id, role_id)
+        VALUES ($1, $2)
+    `
+	_, err := s.db.ExecContext(ctx, query, userID, roleID)
+	if err != nil {
+		// catch unique-violation: user already has the role
+		var pgErr *pq.Error
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return storage.ErrUserHaveRole
+		}
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
 }
