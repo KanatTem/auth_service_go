@@ -14,9 +14,6 @@ func main() {
 
 	log := logger.SetupLogger(cfg.Env)
 
-	if log == nil {
-	}
-
 	application := app.New(log, cfg.GRPC.Port, cfg.TokenTTL)
 
 	go application.GRPCServer.MustRun()

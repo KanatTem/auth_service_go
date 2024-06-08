@@ -30,6 +30,6 @@ COPY --from=builder /app/bin/sso /app/sso
 # copy config directory
 COPY config config
 
-EXPOSE 8080
+EXPOSE 44044
 
 ENTRYPOINT ["./sso"]
